@@ -1,276 +1,179 @@
-// ---------- Demo data (in a real system this comes from Admin/Staff via Firebase) ----------
-const SERVICES=[
-  {id:'cut',name:'ตัดผม',price:80,duration:30,desc:'ทรงคลาสสิก',available:true},
-  {id:'shave',name:'โกนหนวด',price:50,duration:15,desc:'โกนด้วยมีดโกน',available:true},
-  {id:'wash',name:'สระผม',price:40,duration:15,desc:'สระ+นวดหนังศีรษะ',available:true},
-  {id:'color',name:'ทำสีผม',price:250,duration:60,desc:'ปิดโดยแอดมิน',available:false}
-];
-const BARBERS=[
-  {id:'เอ',name:'ช่างเอ',specialty:'ทรงคลาสสิก',working:true,dayOff:false,queueCount:4},
-  {id:'บี',name:'ช่างบี',specialty:'เทรนด์เกาหลี',working:true,dayOff:false,queueCount:1},
-  {id:'ซี',name:'ช่างซี',specialty:'เคราและหนวด',working:true,dayOff:true,queueCount:0} // dayOff:true → ต้องไม่แสดงให้ลูกค้าเลือก
-];
+// ---------- Demo data (shop-wide mock; in production this reads/writes Firebase) ----------
+const CURRENT_STAFF={id:'เอ',name:'ช่างเอ'};
 const CHAIR_POOL=['เก้าอี้ 1','เก้าอี้ 2','เก้าอี้ 3'];
-const AVG_MIN_PER_QUEUE=15;
-let queueCounter=15;
 
-// ---------- State ----------
-let state={
-  selected:[], barberId:undefined, phone:'', name:'',
-  queueStatus:'idle', // idle | waiting | in_service | done | cancelled
-  queueNumber:null, chair:null, startTime:null, bookedAt:null,
-  history:[]
-};
+let QUEUE=[
+  {id:'A012',customer:'คุณสมชาย',services:['ตัดผม'],total:80,barberId:'เอ',status:'in_service',chair:'เก้าอี้ 2',startTime:new Date(Date.now()-8*60000),payment:null},
+  {id:'A013',customer:'คุณวิชัย',services:['ตัดผม','โกนหนวด'],total:130,barberId:'เอ',status:'waiting',chair:null,startTime:null,payment:null},
+  {id:'A014',customer:'คุณกิตติ',services:['สระผม'],total:40,barberId:null,status:'waiting',chair:null,startTime:null,payment:null},
+  {id:'A010',customer:'คุณประยุทธ',services:['ตัดผม'],total:80,barberId:'เอ',status:'done',chair:'เก้าอี้ 1',date:'20/9/2569',payment:{status:'reported',reportedAt:new Date()}},
+  {id:'A009',customer:'คุณอนันต์',services:['ตัดผม','สระผม'],total:120,barberId:'เอ',status:'done',chair:'เก้าอี้ 3',date:'20/9/2569',payment:{status:'confirmed',confirmedBy:'เอ'}},
+];
+let chairStatus='cutting'; // available | cutting | resting — cutting because A012 is in_service
 
-// ---------- Nav / menu ----------
-function toggleMenu(){ document.getElementById('menu-panel').classList.toggle('open'); }
-function closeMenuAndShow(id){ document.getElementById('menu-panel').classList.remove('open'); showScreen(id); }
+// ---------- Login ----------
+function login(){
+  const u=document.getElementById('login-user').value.trim();
+  if(!u){ toast('กรุณากรอก Username'); return; }
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('staff-name-badge').textContent=CURRENT_STAFF.name;
+  document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+  switchView('dashboard');
+}
+function logout(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
 
-function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  if(id==='home') renderHome();
-  if(id==='services') renderServices();
-  if(id==='barber') renderBarberList();
-  if(id==='queue') renderQueueScreen();
+function switchView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===id));
+  updateChairBadge();
+  if(id==='dashboard') renderDashboard();
+  if(id==='myqueue') renderMyQueue();
+  if(id==='payment') renderPayment('all');
+  if(id==='chair') renderChair();
   if(id==='history') renderHistory();
+  if(id==='revenue') renderRevenue();
+}
+function updateChairBadge(){ document.getElementById('chair-badge').textContent='Chair: '+chairStatus.toUpperCase(); }
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+
+function myActiveQueue(){ return QUEUE.filter(q=>(q.barberId===CURRENT_STAFF.id||q.barberId===null) && (q.status==='waiting'||q.status==='in_service')); }
+
+// ---------- Dashboard ----------
+function renderDashboard(){
+  const mine=QUEUE.filter(q=>q.barberId===CURRENT_STAFF.id);
+  const waiting=mine.filter(q=>q.status==='waiting').length;
+  const current=mine.find(q=>q.status==='in_service');
+  const todayRevenue=mine.filter(q=>q.status==='done'&&q.payment&&q.payment.status==='confirmed').reduce((a,q)=>a+q.total,0);
+  const pendingPay=mine.filter(q=>q.payment&&q.payment.status!=='confirmed').length;
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat-card"><b>${waiting}</b><span>My Waiting Queue</span></div>
+    <div class="stat-card"><b>${current?current.id:'-'}</b><span>Current Customer</span></div>
+    <div class="stat-card"><b>${mine.filter(q=>q.status==='done').length}</b><span>Today's Customers</span></div>
+    <div class="stat-card"><b>฿${todayRevenue}</b><span>Today's Revenue</span></div>
+    <div class="stat-card"><b>${pendingPay}</b><span>Pending Payments</span></div>
+    <div class="stat-card"><b>${chairStatus.toUpperCase()}</b><span>Chair</span></div>`;
+  document.getElementById('dash-current').innerHTML=current?
+    `<div class="card"><div class="info"><b>${current.id} · ${current.customer}</b><span>${current.services.join(', ')} · เริ่ม ${current.startTime.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</span></div><span class="badge in_service">IN SERVICE</span></div>`
+    : `<div class="empty">ไม่มีลูกค้าปัจจุบัน</div>`;
 }
 
-function toast(msg){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2200);
+// ---------- My Queue ----------
+function renderMyQueue(){
+  const list=myActiveQueue();
+  const el=document.getElementById('myqueue-list');
+  if(!list.length){ el.innerHTML='<div class="empty">วันนี้ยังไม่มีคิวของคุณ</div>'; return; }
+  el.innerHTML=list.map(q=>{
+    let actions='';
+    if(q.barberId===null) actions+=`<button class="btn small secondary" onclick="takeQueue('${q.id}')">รับคิว</button>`;
+    if(q.barberId===CURRENT_STAFF.id && q.status==='waiting') actions+=`<button class="btn small" onclick="startService('${q.id}')">เริ่มบริการ</button>
+      <button class="btn small danger" onclick="confirmNoShow('${q.id}')">ลูกค้าไม่มา</button>`;
+    if(q.barberId===CURRENT_STAFF.id && q.status==='in_service') actions+=`<button class="btn small" onclick="endService('${q.id}')">จบบริการ</button>`;
+    return `<div class="card">
+      <div class="info"><b>${q.id} · ${q.customer}</b><span>${q.services.join(', ')} · ฿${q.total}</span></div>
+      <span class="badge ${q.status}">${q.status.toUpperCase()}</span>
+      <div class="actions">${actions}</div>
+    </div>`;
+  }).join('');
+}
+function takeQueue(id){
+  const q=QUEUE.find(q=>q.id===id); q.barberId=CURRENT_STAFF.id;
+  toast('รับคิว '+id+' แล้ว'); renderMyQueue();
+}
+function startService(id){
+  // Business rule: เปลี่ยน Queue และ Chair พร้อมกันเป็น transaction เดียว
+  if(QUEUE.some(q=>q.barberId===CURRENT_STAFF.id&&q.status==='in_service')){ toast('คุณมีลูกค้าที่กำลังให้บริการอยู่แล้ว'); return; }
+  const q=QUEUE.find(q=>q.id===id);
+  q.status='in_service'; q.chair=CHAIR_POOL[Math.floor(Math.random()*CHAIR_POOL.length)]; q.startTime=new Date();
+  chairStatus='cutting';
+  toast('เริ่มบริการ '+id); renderMyQueue(); updateChairBadge();
+}
+function confirmNoShow(id){
+  showModal(`ยืนยันว่าลูกค้า ${id} ไม่มาตามคิวหรือไม่?`,'การกระทำนี้จะถูกเก็บสถิติแยกจากการยกเลิก',[
+    {label:'ยืนยัน',cls:'danger',fn:()=>{ QUEUE.find(q=>q.id===id).status='no_show'; toast(id+' ถูกบันทึกเป็น No-show'); renderMyQueue(); closeModal(); }},
+    {label:'ยกเลิก',cls:'secondary',fn:closeModal}
+  ]);
+}
+function endService(id){
+  const q=QUEUE.find(q=>q.id===id);
+  q.status='done'; q.date=new Date().toLocaleDateString('th-TH'); q.payment={status:'pending'};
+  chairStatus='available';
+  toast('จบบริการ '+id+' — รอการชำระเงิน'); renderMyQueue(); renderDashboard(); updateChairBadge();
 }
 
-// ---------- Duplicate Queue Validation ----------
-function hasActiveQueue(){ return state.queueStatus==='waiting' || state.queueStatus==='in_service'; }
-function attemptBooking(){
-  document.getElementById('menu-panel').classList.remove('open');
-  if(hasActiveQueue()){ document.getElementById('dup-modal').classList.add('open'); return; }
-  showScreen('services');
+// ---------- Chair Status ----------
+function renderChair(){
+  const inService=QUEUE.some(q=>q.barberId===CURRENT_STAFF.id&&q.status==='in_service');
+  document.getElementById('chair-card').innerHTML=`
+    <div class="card">
+      <div class="info"><b>สถานะเก้าอี้ปัจจุบัน</b><span>${chairStatus==='cutting'?'🔴 Cutting':chairStatus==='resting'?'🟡 Resting':'🟢 Available'}</span></div>
+      <div class="actions">
+        <button class="btn small ${chairStatus==='available'?'':'secondary'}" onclick="setChair('available')" ${inService?'disabled':''}>Available</button>
+        <button class="btn small ${chairStatus==='resting'?'':'secondary'}" onclick="setChair('resting')" ${inService?'disabled':''}>Resting</button>
+      </div>
+    </div>
+    ${inService?'<p class="note">ห้ามเปลี่ยนเป็น Resting ระหว่างมีลูกค้าอยู่บนเก้าอี้</p>':''}
+  `;
 }
-function hideDupModal(){ document.getElementById('dup-modal').classList.remove('open'); }
-
-// ---------- Home ----------
-function renderHome(){
-  const working=BARBERS.filter(b=>b.working && !b.dayOff);
-  document.getElementById('home-stats').innerHTML=`
-    <div class="stat"><b>${working.length}</b><span>ช่างกำลังให้บริการ</span></div>
-    <div class="stat"><b>${working.reduce((a,b)=>a+b.queueCount,0)}</b><span>คิวที่กำลังรอ</span></div>
-    <div class="stat"><b>1</b><span>เก้าอี้ว่าง</span></div>`;
-  document.getElementById('home-barbers').innerHTML=working.map(b=>`
-    <div class="card"><div class="info"><b><span class="status-dot on"></span>${b.name}</b><span>${b.specialty} · ${b.queueCount} คิวรอ</span></div></div>
-  `).join('');
+function setChair(s){
+  if(QUEUE.some(q=>q.barberId===CURRENT_STAFF.id&&q.status==='in_service')){ toast('ไม่สามารถเปลี่ยนได้ระหว่างให้บริการ'); return; }
+  chairStatus=s; renderChair(); updateChairBadge();
 }
 
-// ---------- Services (with loading + error demo states) ----------
-function renderServices(){
-  const list=document.getElementById('svc-list');
-  list.innerHTML=`<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
-  setTimeout(()=>{
-    list.innerHTML='';
-    SERVICES.forEach(s=>{
-      const picked=state.selected.includes(s.id);
-      const el=document.createElement('div');
-      el.className='card'+(s.available?'':' disabled');
-      el.innerHTML=`<div class="info"><b>${s.name}</b><span>${s.desc} · ${s.duration} นาที · ${s.available?'พร้อมให้บริการ':'ปิดให้บริการ'}</span></div><div class="price">฿${s.price}</div><div class="select-box ${picked?'checked':''}"></div>`;
-      if(s.available) el.onclick=()=>toggleService(s.id);
-      list.appendChild(el);
-    });
-    updateSvcSummary();
-  },400);
-}
-function showServiceError(){
-  document.getElementById('svc-list').innerHTML=`<div class="error-box"><p>ไม่สามารถโหลดข้อมูลบริการได้</p><button class="btn secondary" onclick="renderServices()">ลองใหม่</button></div>`;
-}
-function toggleService(id){
-  const i=state.selected.indexOf(id);
-  if(i>-1) state.selected.splice(i,1); else state.selected.push(id);
-  renderServices();
-}
-function updateSvcSummary(){
-  const chosen=SERVICES.filter(s=>state.selected.includes(s.id));
-  const total=chosen.reduce((a,s)=>a+s.price,0);
-  document.getElementById('svc-summary').style.display=chosen.length?'block':'none';
-  document.getElementById('svc-lines').innerHTML=chosen.map(s=>`<div class="line"><span>${s.name}</span><span>฿${s.price}</span></div>`).join('');
-  document.getElementById('svc-total').textContent='฿'+total;
-  document.getElementById('svc-next').disabled=chosen.length===0;
-}
-
-// ---------- Barber selection ----------
-function renderBarberList(){
-  // Business rule: ช่างที่หยุดวันนี้ (dayOff) ต้องไม่ปรากฏในรายการเลือก
-  document.getElementById('barber-list').innerHTML=BARBERS.filter(b=>!b.dayOff).map(b=>`
-    <div class="card" onclick="pickBarber('${b.id}')">
-      <div class="info"><b>${b.name}</b><span>${b.specialty} · <span class="status-dot on"></span>กำลังทำงาน · ${b.queueCount} คิวรอ</span></div>
-      <div class="select-box" id="b-${b.id}"></div>
+// ---------- Payment Verification ----------
+function renderPayment(filter){
+  document.getElementById('pay-filters').innerHTML=['all','pending','reported','confirmed'].map(f=>
+    `<button class="${filter===f?'on':''}" onclick="renderPayment('${f}')">${f==='all'?'ทั้งหมด':f}</button>`).join('');
+  let rows=QUEUE.filter(q=>q.payment);
+  if(filter!=='all') rows=rows.filter(q=>q.payment.status===filter);
+  const el=document.getElementById('payment-list');
+  if(!rows.length){ el.innerHTML='<div class="empty">ไม่มีรายการ</div>'; return; }
+  el.innerHTML=rows.map(q=>`
+    <div class="card">
+      <div class="info"><b>${q.id} · ${q.customer}</b><span>฿${q.total} · ${q.date||''}</span></div>
+      <span class="badge ${q.payment.status}">${q.payment.status==='reported'?'Customer Reported':q.payment.status}</span>
+      <div class="actions">
+        ${q.payment.status==='pending'?`<button class="btn small secondary" onclick="markReported('${q.id}')">จำลอง: ลูกค้าแจ้งชำระเงิน</button>`:''}
+        ${q.payment.status==='reported'?`<button class="btn small" onclick="confirmPayment('${q.id}')">ยืนยันการชำระเงิน</button>`:''}
+      </div>
     </div>`).join('');
 }
-function pickBarber(id){
-  state.barberId=id;
-  document.querySelectorAll('#barber .select-box').forEach(b=>b.classList.remove('checked'));
-  document.getElementById(id?'b-'+id:'b-none').classList.add('checked');
-  document.getElementById('barber-next').disabled=false;
-}
-function getSelectedBarber(){ return BARBERS.find(b=>b.id===state.barberId) || null; }
-function currentQueueCount(){
-  const b=getSelectedBarber();
-  if(b) return b.queueCount;
-  return BARBERS.filter(b=>b.working && !b.dayOff).reduce((a,b)=>a+b.queueCount,0);
+function markReported(id){ QUEUE.find(q=>q.id===id).payment={status:'reported',reportedAt:new Date()}; renderPayment('all'); }
+function confirmPayment(id){
+  const q=QUEUE.find(q=>q.id===id);
+  q.payment={status:'confirmed',confirmedBy:CURRENT_STAFF.id,confirmedAt:new Date()};
+  toast('ยืนยันการชำระเงิน '+id+' แล้ว');
+  renderPayment('all'); renderDashboard();
 }
 
-// ---------- Identification ----------
-function checkPhone(){
-  const phone=document.getElementById('phone-input').value.trim();
-  state.phone=phone;
-  const nameBlock=document.getElementById('name-block');
-  const nameLabel=document.getElementById('name-label');
-  const nameInput=document.getElementById('name-input');
-  nameBlock.style.display='block';
-  if(phone==='0812345678'){
-    nameLabel.textContent='พบข้อมูลลูกค้าเดิม';
-    nameInput.value='คุณสมชาย'; nameInput.disabled=true;
-  } else {
-    nameLabel.textContent='ลูกค้าใหม่ — กรอกชื่อของคุณ';
-    nameInput.value=''; nameInput.disabled=false;
-  }
-  showBookingSummary();
-}
-function showBookingSummary(){
-  const chosen=SERVICES.filter(s=>state.selected.includes(s.id));
-  const total=chosen.reduce((a,s)=>a+s.price,0);
-  document.getElementById('c-services').textContent=chosen.map(s=>s.name).join(', ');
-  document.getElementById('c-barber').textContent=getSelectedBarber()?getSelectedBarber().name:'ไม่ระบุช่าง';
-  document.getElementById('c-queuecount').textContent=currentQueueCount()+' คิว';
-  document.getElementById('c-total').textContent='฿'+total;
-  document.getElementById('confirm-summary').style.display='block';
-  document.getElementById('confirm-btn').style.display='block';
-}
-
-// ---------- Booking / Queue ----------
-function confirmBooking(){
-  state.name=document.getElementById('name-input').value||'ลูกค้า';
-  state.queueStatus='waiting';
-  state.queueNumber='A0'+(queueCounter++);
-  state.chair=null; state.startTime=null;
-  state.bookedAt=new Date();
-  toast('จองคิวสำเร็จ');
-  showScreen('queue');
-}
-
-function renderQueueScreen(){
-  const el=document.getElementById('queue-content');
-  el.innerHTML=`<div class="skeleton"></div><div class="skeleton"></div>`;
-  setTimeout(()=>{
-    if(state.queueStatus==='idle' || state.queueStatus==='cancelled'){
-      el.innerHTML=`<div class="empty">คุณไม่มีคิวที่กำลังใช้งานอยู่</div><button class="btn block" onclick="attemptBooking()">จองคิวเลย</button>`;
-      return;
-    }
-    const before=currentQueueCount();
-    const eta=before*AVG_MIN_PER_QUEUE;
-    const serviceNames=SERVICES.filter(s=>state.selected.includes(s.id)).map(s=>s.name).join(', ');
-    const barberName=getSelectedBarber()?getSelectedBarber().name:'ไม่ระบุ (ระบบจัดให้)';
-
-    if(state.queueStatus==='waiting'){
-      el.innerHTML=`
-        <div class="status-pill">กำลังรอคิว</div>
-        <div class="queue-number">${state.queueNumber}</div>
-        <div class="summary">
-          <div class="line"><span>คิวก่อนหน้าคุณ</span><span>${before} คิว</span></div>
-          <div class="line"><span>เวลารอโดยประมาณ</span><span>${eta} นาที</span></div>
-          <div class="line"><span>ช่าง</span><span>${barberName}</span></div>
-          <div class="line"><span>บริการ</span><span>${serviceNames}</span></div>
-        </div>
-        <button class="btn secondary block" onclick="cancelQueue()">ยกเลิกคิว</button>
-        <div class="demo-box">
-          <p>ปุ่มจำลองฝั่งช่าง (สำหรับสาธิตการอัปเดตแบบ real-time)</p>
-          <button class="btn secondary" onclick="simulateStart()">จำลอง: ช่างเริ่มบริการ</button>
-        </div>`;
-    } else if(state.queueStatus==='in_service'){
-      el.innerHTML=`
-        <div class="status-pill" style="background:#1f3a24;color:#8fd18f">กำลังรับบริการ</div>
-        <div class="queue-number">${state.queueNumber}</div>
-        <div class="summary">
-          <div class="line"><span>ช่าง</span><span>${barberName}</span></div>
-          <div class="line"><span>เก้าอี้</span><span>${state.chair}</span></div>
-          <div class="line"><span>บริการ</span><span>${serviceNames}</span></div>
-          <div class="line"><span>เวลาเริ่ม</span><span>${state.startTime.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</span></div>
-        </div>
-        <div class="demo-box">
-          <p>ปุ่มจำลองฝั่งช่าง</p>
-          <button class="btn secondary" onclick="simulateEnd()">จำลอง: ช่างจบบริการ</button>
-        </div>`;
-    }
-  },350);
-}
-
-function cancelQueue(){
-  // อนุญาตเฉพาะตอน waiting เท่านั้น (ปุ่มนี้แสดงเฉพาะตอน waiting อยู่แล้ว)
-  state.queueStatus='cancelled';
-  toast('ยกเลิกคิวเรียบร้อยแล้ว');
-  resetAndGoHome();
-}
-function simulateStart(){
-  if(state.queueStatus!=='waiting') return;
-  state.queueStatus='in_service';
-  state.chair=CHAIR_POOL[Math.floor(Math.random()*CHAIR_POOL.length)];
-  state.startTime=new Date();
-  renderQueueScreen();
-}
-function simulateEnd(){
-  if(state.queueStatus!=='in_service') return;
-  state.queueStatus='done';
-  const chosen=SERVICES.filter(s=>state.selected.includes(s.id));
-  const total=chosen.reduce((a,s)=>a+s.price,0);
-  document.getElementById('p-queue').textContent=state.queueNumber;
-  document.getElementById('p-barber').textContent=getSelectedBarber()?getSelectedBarber().name:'ไม่ระบุ';
-  document.getElementById('p-services').textContent=chosen.map(s=>s.name).join(', ');
-  document.getElementById('p-total').textContent='฿'+total;
-  document.getElementById('pay-pending').style.display='block';
-  document.getElementById('pay-success').style.display='none';
-  document.getElementById('pay-note').style.display='none';
-  document.getElementById('staff-confirm-box').style.display='none';
-  showScreen('payment');
-}
-
-// ---------- Payment ----------
-function reportPayment(){
-  document.getElementById('pay-note').style.display='block';
-  document.getElementById('staff-confirm-box').style.display='block';
-}
-function simulateConfirmPayment(){
-  const chosen=SERVICES.filter(s=>state.selected.includes(s.id));
-  const total=chosen.reduce((a,s)=>a+s.price,0);
-  const now=new Date();
-  const barberName=getSelectedBarber()?getSelectedBarber().name:'ไม่ระบุ';
-  state.history.unshift({
-    queue:state.queueNumber, barber:barberName, services:chosen.map(s=>s.name).join(', '),
-    total, date:now.toLocaleDateString('th-TH'), time:now.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}),
-    paymentStatus:'confirmed'
-  });
-  document.getElementById('s-queue').textContent=state.queueNumber;
-  document.getElementById('s-barber').textContent=barberName;
-  document.getElementById('s-services').textContent=chosen.map(s=>s.name).join(', ');
-  document.getElementById('s-datetime').textContent=now.toLocaleDateString('th-TH')+' '+now.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
-  document.getElementById('s-total').textContent='฿'+total;
-  document.getElementById('pay-pending').style.display='none';
-  document.getElementById('pay-success').style.display='block';
-}
-
-// ---------- History ----------
+// ---------- History / Revenue ----------
 function renderHistory(){
+  const rows=QUEUE.filter(q=>q.barberId===CURRENT_STAFF.id&&q.status==='done');
   const el=document.getElementById('history-list');
-  if(!state.history.length){ el.innerHTML='<div class="empty">ยังไม่มีประวัติการใช้บริการ</div>'; return; }
-  el.innerHTML=state.history.map(h=>`
-    <div class="card"><div class="info"><b>${h.queue} · ${h.services}</b><span>${h.date} ${h.time} · ${h.barber} · ${h.paymentStatus==='confirmed'?'ชำระเงินแล้ว':'รอตรวจสอบ'}</span></div><div class="price">฿${h.total}</div></div>
-  `).join('');
+  if(!rows.length){ el.innerHTML='<div class="empty">ยังไม่มีประวัติ</div>'; return; }
+  el.innerHTML=rows.map(q=>`<div class="card"><div class="info"><b>${q.id} · ${q.customer}</b><span>${q.services.join(', ')} · ${q.date}</span></div><span class="badge ${q.payment?q.payment.status:'pending'}">${q.payment?q.payment.status:'pending'}</span><div class="info"><b>฿${q.total}</b></div></div>`).join('');
+}
+function renderRevenue(){
+  const confirmed=QUEUE.filter(q=>q.barberId===CURRENT_STAFF.id&&q.status==='done'&&q.payment&&q.payment.status==='confirmed');
+  const total=confirmed.reduce((a,q)=>a+q.total,0);
+  document.getElementById('revenue-stats').innerHTML=`
+    <div class="stat-card"><b>฿${total}</b><span>Today's Revenue</span></div>
+    <div class="stat-card"><b>฿${total}</b><span>Weekly Revenue (demo)</span></div>
+    <div class="stat-card"><b>฿${total}</b><span>Monthly Revenue (demo)</span></div>
+    <div class="stat-card"><b>${confirmed.length}</b><span>Number of Customers</span></div>
+    <div class="stat-card"><b>${confirmed.length}</b><span>Completed Services</span></div>`;
+  document.getElementById('note-rule')?.remove();
 }
 
-// ---------- Reset ----------
-function resetAndGoHome(){
-  state={selected:[],barberId:undefined,phone:'',name:'',queueStatus:'idle',queueNumber:null,chair:null,startTime:null,bookedAt:null,history:state.history};
-  showScreen('home');
+// ---------- Modal ----------
+function showModal(title,desc,buttons){
+  document.getElementById('modal-content').innerHTML=`<h3>${title}</h3><p>${desc}</p><div class="modal-actions">${buttons.map((b,i)=>`<button class="btn ${b.cls}" id="modal-btn-${i}">${b.label}</button>`).join('')}</div>`;
+  buttons.forEach((b,i)=>document.getElementById('modal-btn-'+i).onclick=b.fn);
+  document.getElementById('modal-overlay').classList.add('open');
 }
-
-// ---------- Init ----------
-renderHome();
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); }
