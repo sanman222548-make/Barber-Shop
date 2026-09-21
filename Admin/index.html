@@ -1,1 +1,135 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin — ร้านตัดผม</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<section id="login-screen" class="login-wrap">
+  <div class="login-card">
+    <h1>The Gentleman&apos;s Chair</h1>
+    <p class="sub">Admin / Owner Login</p>
+    <label>Username</label>
+    <input type="text" id="login-user" placeholder="username">
+    <label>Password</label>
+    <input type="password" id="login-pass" placeholder="password">
+    <button class="btn block" onclick="login()">เข้าสู่ระบบ</button>
+  </div>
+</section>
+
+<div id="app" style="display:none">
+  <aside class="sidebar">
+    <div class="brand">Admin Panel</div>
+    <button class="nav-item active" data-view="overview">Dashboard</button>
+    <button class="nav-item" data-view="services">Services</button>
+    <button class="nav-item" data-view="barbers">Barbers</button>
+    <button class="nav-item" data-view="accounts">Staff Accounts</button>
+    <button class="nav-item" data-view="queue">Queue Management</button>
+    <button class="nav-item" data-view="payments">Payments</button>
+    <button class="nav-item" data-view="history">Service History</button>
+    <button class="nav-item" data-view="reports">Reports &amp; Analytics</button>
+    <button class="nav-item" data-view="settings">Settings</button>
+    <button class="nav-item logout" onclick="logout()">Logout</button>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <span id="page-title">Today's Overview</span>
+      <span id="today-date"></span>
+    </header>
+
+    <section class="view active" id="view-overview">
+      <div class="stat-grid" id="ov-stats"></div>
+      <div class="two-col">
+        <div>
+          <h3 class="sub-title">Barbers</h3>
+          <div id="ov-barbers"></div>
+        </div>
+        <div>
+          <h3 class="sub-title">Chairs</h3>
+          <div id="ov-chairs"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-services">
+      <div class="row-between"><h2 class="section-title">Service Management</h2><button class="btn" onclick="openServiceModal()">+ Add Service</button></div>
+      <div id="services-table"></div>
+    </section>
+
+    <section class="view" id="view-barbers">
+      <div class="row-between"><h2 class="section-title">Barber Management</h2><button class="btn" onclick="openBarberModal()">+ Add Barber</button></div>
+      <div id="barbers-table"></div>
+    </section>
+
+    <section class="view" id="view-accounts">
+      <div class="row-between"><h2 class="section-title">Staff Account Management</h2><button class="btn" onclick="createAccount()">+ Create Account</button></div>
+      <div id="accounts-table"></div>
+    </section>
+
+    <section class="view" id="view-queue">
+      <h2 class="section-title">Queue Management</h2>
+      <div class="filter-bar" id="queue-filters"></div>
+      <div id="queue-table"></div>
+    </section>
+
+    <section class="view" id="view-payments">
+      <h2 class="section-title">Payment Management</h2>
+      <div class="filter-bar" id="pay-filters"></div>
+      <div id="payments-table"></div>
+    </section>
+
+    <section class="view" id="view-history">
+      <h2 class="section-title">Service History</h2>
+      <div id="history-table"></div>
+    </section>
+
+    <section class="view" id="view-reports">
+      <h2 class="section-title">Reports &amp; Analytics</h2>
+      <div class="stat-grid" id="report-stats"></div>
+      <div class="two-col">
+        <div class="chart-box">
+          <h3 class="sub-title">Revenue by Barber</h3>
+          <div id="chart-barber"></div>
+        </div>
+        <div class="chart-box">
+          <h3 class="sub-title">Revenue by Service</h3>
+          <div id="chart-service"></div>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="chart-box">
+          <h3 class="sub-title">Revenue Over Time (7 วัน)</h3>
+          <div id="chart-line"></div>
+        </div>
+        <div class="chart-box">
+          <h3 class="sub-title">Queue Status Distribution</h3>
+          <div id="chart-donut"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <h2 class="section-title">Settings</h2>
+      <label>Shop Name</label><input type="text" id="set-name" value="The Gentleman's Chair">
+      <label>Opening Hours</label><input type="text" id="set-hours" value="ทุกวัน 10:00–20:00">
+      <label>PromptPay QR</label>
+      <div class="qr-box"></div>
+      <button class="btn" onclick="toast('บันทึกการตั้งค่าแล้ว')">บันทึกการตั้งค่า</button>
+    </section>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modal-overlay"><div class="modal-box" id="modal-content"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
 
