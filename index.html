@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>ร้านตัดผม — Customer</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <nav>
+    <span class="brand">The Heritage Barber</span>
+    <button class="btn cta-mini" onclick="attemptBooking()">จองคิว</button>
+    <button class="hamburger" onclick="toggleMenu()">☰</button>
+  </nav>
+  <div id="menu-panel" class="menu-panel">
+    <button onclick="closeMenuAndShow('home')">หน้าหลัก</button>
+    <button onclick="closeMenuAndShow('services')">บริการ</button>
+    <button onclick="attemptBooking()">จองคิว</button>
+    <button onclick="closeMenuAndShow('queue')">เช็คคิวของฉัน</button>
+    <button onclick="closeMenuAndShow('history')">ประวัติ</button>
+    <button onclick="closeMenuAndShow('contact')">ติดต่อร้าน</button>
+  </div>
+
+  <div id="dup-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h3>คุณมีคิวที่กำลังรออยู่แล้ว</h3>
+      <p>ไม่สามารถจองคิวซ้ำได้จนกว่าคิวเดิมจะเสร็จสิ้นหรือถูกยกเลิก</p>
+      <button class="btn block" onclick="closeMenuAndShow('queue');hideDupModal()">ดูคิวของฉัน</button>
+      <button class="btn secondary block" onclick="hideDupModal()">ปิด</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <section class="screen active" id="home">
+    <div class="hero">
+      <span class="badge-open">● OPEN วันนี้เปิดให้บริการ</span>
+      <h1>The Heritage Barber</h1>
+      <p>ตัดผมสไตล์คลาสสิก บริการระดับพรีเมียม</p>
+      <button class="btn" onclick="attemptBooking()">จองคิว</button>
+      <button class="btn secondary" style="margin-left:8px"
+        onclick="closeMenuAndShow('services')">บริการและราคา</button>
+    </div>
+    <div class="row-stats" id="home-stats"></div>
+
+    <h2 class="section-title">บริการยอดนิยม</h2>
+    <div class="card">
+      <div class="info"><b>ตัดผม</b><span>ทรงคลาสสิก · 30 นาที</span></div>
+      <div class="price">฿80</div>
+    </div>
+    <div class="card">
+      <div class="info"><b>โกนหนวด</b><span>โกนด้วยมีดโกน · 15 นาที</span></div>
+      <div class="price">฿50</div>
+    </div>
+
+    <h2 class="section-title">ช่างของเรา</h2>
+    <div id="home-barbers"></div>
+
+    <h2 class="section-title">ทำไมต้องเลือกเรา</h2>
+    <div class="why-grid">
+      <div class="why-item"><b>ประสบการณ์ 10 ปี</b><span>ช่างมืออาชีพ ผ่านการอบรมเฉพาะทาง</span></div>
+      <div class="why-item"><b>จองคิวออนไลน์</b><span>ไม่ต้องรอหน้าร้าน เช็คสถานะได้แบบเรียลไทม์</span></div>
+      <div class="why-item"><b>ราคาชัดเจน</b><span>ไม่มีค่าใช้จ่ายแอบแฝง</span></div>
+    </div>
+  </section>
+
+  <section class="screen" id="services">
+    <h2 class="section-title">บริการและราคา</h2>
+    <div id="svc-list"></div>
+    <div class="summary" id="svc-summary" style="display:none">
+      <div id="svc-lines"></div>
+      <div class="total"><span>รวม</span><span id="svc-total">฿0</span></div>
+    </div>
+    <button class="btn block" id="svc-next" disabled onclick="showScreen('barber')">ดำเนินการต่อ</button>
+  </section>
+
+  <section class="screen" id="barber">
+    <h2 class="section-title">เลือกช่าง</h2>
+    <div class="card" onclick="pickBarber(null)">
+      <div class="info"><b>ไม่ระบุช่าง</b><span>ระบบจัดคิวให้อัตโนมัติ</span></div>
+      <div class="select-box" id="b-none"></div>
+    </div>
+    <div id="barber-list"></div>
+    <button class="btn block" id="barber-next" disabled onclick="showScreen('identify')">ดำเนินการต่อ</button>
+  </section>
+
+  <section class="screen" id="identify">
+    <h2 class="section-title">ระบุตัวตนของคุณ</h2>
+    <label>เบอร์โทรศัพท์</label>
+    <input type="tel" id="phone-input" placeholder="08XXXXXXXX">
+    <button class="btn secondary block" onclick="checkPhone()">ค้นหาข้อมูล</button>
+    <div id="name-block" style="display:none;margin-top:14px">
+      <label id="name-label">ชื่อ</label>
+      <input type="text" id="name-input" placeholder="กรอกชื่อของคุณ">
+    </div>
+    <div class="summary" id="confirm-summary" style="display:none">
+      <h3 style="margin-bottom:8px;font-size:15px">ตรวจสอบข้อมูลก่อนยืนยันการจอง</h3>
+      <div class="line"><span>บริการ</span><span id="c-services"></span></div>
+      <div class="line"><span>ช่าง</span><span id="c-barber"></span></div>
+      <div class="line"><span>จำนวนคิวรอ</span><span id="c-queuecount"></span></div>
+      <div class="total"><span>ยอดรวม</span><span id="c-total"></span></div>
+    </div>
+    <button class="btn block" id="confirm-btn" style="display:none" onclick="confirmBooking()">ยืนยันการจอง</button>
+  </section>
+
+  <section class="screen" id="queue">
+    <div id="queue-content"></div>
+  </section>
+
+  <section class="screen" id="payment">
+    <div id="pay-pending">
+      <h2 class="section-title">การชำระเงิน</h2>
+      <div class="summary">
+        <div class="line"><span>คิว</span><span id="p-queue"></span></div>
+        <div class="line"><span>ช่าง</span><span id="p-barber"></span></div>
+        <div class="line"><span>บริการ</span><span id="p-services"></span></div>
+        <div class="total"><span>ยอดที่ต้องชำระ</span><span id="p-total"></span></div>
+      </div>
+      <div class="qr-box"></div>
+      <button class="btn block" onclick="reportPayment()">แจ้งชำระเงินแล้ว</button>
+      <p id="pay-note" style="display:none;text-align:center;color:var(--gray);font-size:13px;margin-top:10px">
+        แจ้งชำระเงินแล้ว กรุณารอพนักงานตรวจสอบ</p>
+      <div class="demo-box" id="staff-confirm-box" style="display:none">
+        <p>ปุ่มจำลองฝั่ง staff</p>
+        <button class="btn secondary" onclick="simulateConfirmPayment()">จำลอง: staff ยืนยันรับเงิน</button>
+      </div>
+    </div>
+    <div id="pay-success" style="display:none;text-align:center">
+      <h1 style="color:var(--gold);margin:20px 0 6px">ชำระเงินสำเร็จ</h1>
+      <p style="color:var(--gray);margin-bottom:20px">ขอบคุณที่ใช้บริการ</p>
+      <div class="summary" style="text-align:left">
+        <div class="line"><span>คิว</span><span id="s-queue"></span></div>
+        <div class="line"><span>ช่าง</span><span id="s-barber"></span></div>
+        <div class="line"><span>บริการ</span><span id="s-services"></span></div>
+        <div class="line"><span>วันที่ / เวลา</span><span id="s-datetime"></span></div>
+        <div class="total"><span>ยอดชำระ</span><span id="s-total"></span></div>
+      </div>
+      <button class="btn block" onclick="closeMenuAndShow('history')">ดูประวัติ</button>
+      <button class="btn secondary block" onclick="resetAndGoHome()">กลับหน้าหลัก</button>
+    </div>
+  </section>
+
+  <section class="screen" id="history">
+    <h2 class="section-title">ประวัติการใช้บริการ</h2>
+    <div id="history-list"></div>
+  </section>
+
+  <section class="screen" id="contact">
+    <h2 class="section-title">ติดต่อร้าน</h2>
+    <div class="card">
+      <div class="info"><b>ที่อยู่</b><span>123 ถนนสุขุมวิท กรุงเทพฯ</span></div>
+    </div>
+    <div class="card">
+      <div class="info"><b>โทรศัพท์</b><span>02-123-4567</span></div>
+    </div>
+    <div class="card">
+      <div class="info"><b>เวลาทำการ</b><span>ทุกวัน 10:00–20:00</span></div>
+    </div>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
